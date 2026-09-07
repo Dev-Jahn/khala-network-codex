@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+import { spawn } from 'node:child_process';
+import { context, CORE } from '../lib/context.mjs';
+import { bind, readBinding, unbind } from '../lib/binding.mjs';
+
+try {
+  const args = process.argv.slice(2);
+  if (!args.length || args[0] === '--help') {
+    console.log('khala-codex: Claude-compatible mail for Codex.\nUsage: khala-codex <khala command> [args]\n       khala-codex setup\n       khala-codex run [codex options]\n       khala-codex bind|session\n       khala-codex unbind [--thread UUID]\n       khala-codex bridge --socket PATH\nIdentity: KHALA_SESSION or .khala-codex-session.');
+  } else if (args[0] === 'setup') {
+    const { setup } = await import('../lib/setup.mjs');
+    await setup();
+  } else if (args[0] === 'run') {
+    const { launch } = await import('../lib/launch.mjs');
+    process.exitCode = await launch(args.slice(1));
+  } else if (args[0] === 'bind') {
+    console.log(JSON.stringify(bind(context(), process.env.CODEX_THREAD_ID, process.env.KHALA_CODEX_SOCKET ?? ''), null, 2));
+  } else if (args[0] === 'unbind') {
+    if (args.length !== 1 && (args.length !== 3 || args[1] !== '--thread')) throw new Error('Usage: khala-codex unbind [--thread UUID]');
+    unbind(context(), args[2] ?? process.env.CODEX_THREAD_ID);
+  } else if (args[0] === 'session') {
+    console.log(JSON.stringify(readBinding(context()), null, 2));
+  } else if (args[0] === 'bridge') {
+    if (args.length !== 3 || args[1] !== '--socket' || !args[2].startsWith('/')) throw new Error('Usage: khala-codex bridge --socket /absolute/path');
+    const { bridge } = await import('../lib/bridge.mjs');
+    const controller = new AbortController();
+    process.once('SIGTERM', () => controller.abort()); process.once('SIGINT', () => controller.abort());
+    await bridge(context().home, args[2], controller.signal);
+  } else {
+    const noIdentity = new Set(['init', 'version', 'capabilities', 'presence', 'minds', 'sync', 'reconcile', 'link', 'dashboard', 'status', 'node', 'invite', 'watcher', 'retire']);
+    const env = { ...process.env };
+    if (env.CODEX_THREAD_ID) env.KHALA_HARNESS_SESSION_ID = env.CODEX_THREAD_ID;
+    const explicitIdentity = (['send', 'say', 'notify'].includes(args[0]) && args.includes('--as')) ||
+      (args[0] === 'watch' && args.includes('--session')) || (args[0] === 'stream' && args[1] === 'cat');
+    if (!noIdentity.has(args[0]) && !explicitIdentity) env.KHALA_SESSION = context().identity;
+    const child = spawn('bash', [CORE, ...args], { env, stdio: 'inherit' });
+    child.on('error', error => { console.error(`khala-codex: ${error.message}`); process.exitCode = 1; });
+    child.on('exit', (code, signal) => { process.exitCode = code ?? (signal ? 1 : 0); });
+  }
+} catch (error) {
+  console.error(`khala-codex: ${error.message}`);
+  process.exitCode = 1;
+}

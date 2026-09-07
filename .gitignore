@@ -1,0 +1,6 @@
+.hippo/
+.khala-codex-session
+.khala-session
+node_modules/
+coverage/
+.DS_Store
