@@ -11,6 +11,13 @@
   channel request `{v:1, content, meta}` / response `{ok:true}` protocol.
   Codex has no Claude socket route. Local registration, PID/start checks,
   leases, doorbell policy and `ears 1` remain upstream responsibilities.
+- Channel instances use 96 random bits encoded as 24 hex characters. The exact
+  `<runtime>/channels/<instance>.sock` contract is preserved. On the reported
+  macOS default runtime root this makes the socket path 97 bytes instead of
+  109, fixing the `listen EINVAL` failure in 0.2.0. Its earlier macOS fixture
+  used a short runtime override and missed the default-path failure. The
+  regression test now exercises socket creation, registration, delivery and
+  cleanup with a runtime root of the same length.
 - The App Server route verifies the bound loaded thread/cwd and delivers a
   `functionCallOutput`. Ordinary Codex uses its supported `queue` command,
   targeting the hook-bound thread UUID and original `CODEX_HOME`, with a fixed
