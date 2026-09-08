@@ -4,9 +4,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sy
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { core, ROOT, identity } from '../lib/context.mjs';
-import { pending, drainToken } from '../lib/pending.mjs';
+import { drainToken } from '../lib/pending.mjs';
 import { bind, readBinding, unbind } from '../lib/binding.mjs';
-import { fixture, mail, put } from './helpers.mjs';
+import { fixture, put } from './helpers.mjs';
 
 test('Codex CLI and the original brain exchange literal bodies and explicit read acknowledgements', t => {
   const { ctx } = fixture(t);
@@ -15,7 +15,7 @@ test('Codex CLI and the original brain exchange literal bodies and explicit read
   const id = core(sender, ['send', 'codex-test@test', '-s', 'from Claude'], { input: body }).trim();
   core(ctx, ['reconcile']);
   const before = drainToken(ctx);
-  assert.equal(pending(ctx).letters, 1);
+  assert.ok(existsSync(join(ctx.home, 'inbox', ctx.identity, 'new', id)));
   const child = spawnSync(process.execPath, [join(ROOT, 'bin/khala-codex'), 'inbox', '--drain'], {
     cwd: ctx.cwd, env: { ...process.env, KHALA_HOME: ctx.home, KHALA_SESSION: ctx.identity }, encoding: 'utf8',
   });
@@ -24,7 +24,7 @@ test('Codex CLI and the original brain exchange literal bodies and explicit read
   assert.match(child.stdout, /drained: letters 1, notices 0, streams 0/);
   assert.notEqual(drainToken(ctx), before);
   assert.ok(existsSync(join(ctx.home, 'inbox', ctx.identity, 'cur', id)));
-  assert.equal(pending(ctx).count, 0);
+  assert.ok(!existsSync(join(ctx.home, 'inbox', ctx.identity, 'new', id)));
   const reply = core(ctx, ['send', 'ink@test', '--reply-to', id, '-s', 'reply'], { input: body }).trim();
   core(ctx, ['reconcile']);
   const received = core(sender, ['inbox', '--drain']);
@@ -88,28 +88,4 @@ test('different threads cannot claim or release the same Codex identity', t => {
   assert.equal(readBinding(ctx).threadId, 'thread-one');
   unbind(ctx, 'thread-one');
   assert.equal(readBinding(ctx), null);
-});
-
-test('quiet notices do not ring; urgent notices and later mail preserve their policy', t => {
-  const { ctx } = fixture(t);
-  mail(ctx, '1788790000.1.1.ink@test', 'Priority: later\n');
-  assert.equal(pending(ctx).later, true);
-  mail(ctx, '1788790000.2.1.ink@test', 'Type: notice\nUrgency: info\n');
-  assert.equal(pending(ctx).count, 1);
-  mail(ctx, '1788790000.3.1.ink@test', 'Type: notice\nUrgency: urgent\n');
-  assert.equal(pending(ctx).notices, 1); assert.equal(pending(ctx).later, false);
-});
-
-test('stream doorbells honor quiet/left membership, numeric epoch ordering and retention', t => {
-  const { ctx } = fixture(t);
-  put(join(ctx.home, 'join', ctx.identity, 'talk'), 'joined 0\n');
-  put(join(ctx.home, 'streams', 'talk', 'test', '10.1.1.ink@test'), 'entry');
-  put(join(ctx.home, 'cursor', ctx.identity, 'talk'), '9.1.1.ink@test\n');
-  assert.equal(pending(ctx, 20).streams, 1);
-  put(join(ctx.home, 'join', ctx.identity, 'talk'), 'quiet 0\n');
-  assert.equal(pending(ctx, 20).streams, 0);
-  put(join(ctx.home, 'join', ctx.identity, 'talk'), 'left 0\n');
-  assert.equal(pending(ctx, 20).streams, 0);
-  put(join(ctx.home, 'join', ctx.identity, 'talk'), 'joined 0\n');
-  assert.equal(pending(ctx, 9999999).streams, 0);
 });

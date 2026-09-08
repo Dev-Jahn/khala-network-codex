@@ -10,7 +10,7 @@ assert.equal(manifest.name, 'khala-network-codex');
 assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
 assert.equal(JSON.parse(read('package.json')).version, manifest.version);
 assert.ok(!JSON.stringify(manifest).includes('[TODO:'));
-for (const event of ['SessionStart', 'PostToolUse', 'UserPromptSubmit', 'Stop', 'SessionEnd']) {
+for (const event of ['SessionStart', 'Interrupt', 'UserPromptSubmit', 'Stop', 'SessionEnd']) {
   assert.ok(JSON.parse(read('hooks/hooks.json')).hooks[event]);
 }
 assert.match(read('skills/khala/SKILL.md'), /^---\nname: khala\n/);

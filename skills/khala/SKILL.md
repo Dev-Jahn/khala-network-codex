@@ -24,7 +24,8 @@ hosts or replace an existing node config.
 binding, including `harness: codex`. A name already bound to another thread is
 an error. `unbind --thread <old-id>` is explicit cleanup for a finished session.
 
-When `KHALA-CODEX/1` arrives as `khala_doorbell` tool output, immediately run:
+When `KHALA-CODEX/1` arrives as a fixed queued notification or as
+`khala_doorbell` tool output, immediately run:
 
 ```sh
 /absolute/plugin/bin/khala-codex inbox --drain
@@ -62,19 +63,30 @@ exists; quiet and leave decisions are preserved. `presence`, `minds`,
 are the upstream fleet tools. Declare actual values only. Harness identity is
 a machine-written registration fact, separate from profile and model.
 
-For automatic active/idle delivery, launch the next session with
-`khala-codex run [Codex options]`. It connects a Codex TUI to its own local App
+Ordinary `codex` supports automatic receive: on the first submitted turn after
+startup/resume, trusted SessionStart hooks bind the thread and start a detached
+bridge. Opening an untouched TUI alone does not run that hook. The shared conduit delivers to this
+bridge, which calls `codex queue` with a fixed doorbell. The doorbell is recorded
+as user input, but it contains no peer body, subject, or instructions. Do not
+describe this as a native Claude channel or native tool-output notification.
+The original `CODEX_HOME`, thread UUID and live process owner are retained.
+SessionEnd releases the binding; a dead owner also causes the bridge to exit.
+UserPromptSubmit/Stop/Interrupt track activity so `--later` can wait for idle.
+
+For native tool-output delivery, use `khala-codex run [Codex options]`.
+It connects a Codex TUI to its own local App
 Server and connects Khala's channel-only conduit route to native tool outputs.
-The bridge never writes user input, resumes an unloaded thread, or signals
-another session. An existing App Server can be connected explicitly with
+This route never writes user input or resumes an unloaded thread. An existing
+App Server can be connected explicitly with
 `KHALA_CODEX_SOCKET=/absolute/socket` on its hooks and
 `khala-codex bridge --socket /absolute/socket` in a terminal.
 
-Ordinary standalone Codex has no inbound App Server socket: trusted hooks can
-remind it at SessionStart/UserPromptSubmit/PostToolUse, and manual drain works.
-Do not claim idle wake or `WATCHING=yes` for that mode. Stop writes turn evidence
-only; it never manufactures a user continuation. Plugin hooks must be reviewed
-in Codex `/hooks`, and a new thread is needed after plugin installation.
+Do not claim automatic receive from installation alone. Hooks must be reviewed
+in Codex `/hooks`; after installing the update, start/resume and submit one message.
+If the session identity is declared after startup, run `bind` inside that session
+to register it and start the bridge. Check `status` for a verified channel;
+startup failures appear in the hook error and `$KHALA_HOME/log/codex-<identity>.log`.
+There is no fallback from a failed route to another transport.
 
 The node still needs its shared `khala link` and conduit running. `run` calls
 the idempotent upstream `node ensure`; `status` reports shared registration,

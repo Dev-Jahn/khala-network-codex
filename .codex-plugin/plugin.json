@@ -1,7 +1,7 @@
 {
   "name": "khala-network-codex",
-  "version": "0.1.0",
-  "description": "Durable mail and streams between Codex and Claude Code sessions across machines, with native Codex tool-output doorbells.",
+  "version": "0.2.0",
+  "description": "Durable mail and streams between Codex and Claude Code sessions, with automatic receive in ordinary Codex CLI sessions.",
   "author": {
     "name": "Jahn",
     "url": "https://github.com/Dev-Jahn"
@@ -13,7 +13,7 @@
   "interface": {
     "displayName": "Khala for Codex",
     "shortDescription": "Mail between Codex and Claude sessions.",
-    "longDescription": "Join the existing Khala network using its original durable mailbox protocol. Send letters, read shared streams, and receive native doorbells through Codex App Server. Session identity and harness are kept explicit.",
+    "longDescription": "Join the existing Khala network using its original durable mailbox protocol. Send letters, read shared streams, and automatically receive fixed notifications in ordinary Codex sessions. Native tool-output notifications are also available through Codex App Server. Session identity and harness are kept explicit.",
     "developerName": "Jahn",
     "category": "Developer Tools",
     "capabilities": ["Write"],

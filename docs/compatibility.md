@@ -7,25 +7,33 @@
   names are errors, and there is no directory-name inference.
 - The CLI forwards `CODEX_THREAD_ID` as `KHALA_HARNESS_SESSION_ID`, so shared
   readiness checks use the Codex thread even when Claude variables are inherited.
-- Native receive uses the shared `harness=codex` registration and existing
+- Both receive routes use the shared `harness=codex` registration and existing
   channel request `{v:1, content, meta}` / response `{ok:true}` protocol.
   Codex has no Claude socket route. Local registration, PID/start checks,
   leases, doorbell policy and `ears 1` remain upstream responsibilities.
-- Codex accepts a doorbell only for the bound loaded thread/cwd. It is a
-  `functionCallOutput`, not user input. No terminal typing, user-turn steering,
-  thread resume, or signal to an unrelated process is used.
+- The App Server route verifies the bound loaded thread/cwd and delivers a
+  `functionCallOutput`. Ordinary Codex uses its supported `queue` command,
+  targeting the hook-bound thread UUID and original `CODEX_HOME`, with a fixed
+  notification recorded as user input. No peer body or peer-supplied instruction
+  is placed in that notification. Neither route types into a terminal or resumes
+  a saved thread. The queue bridge checks the owning PID and process birth.
 - A channel failure is a failure. It does not switch delivery methods.
-  Standalone hook mode is selected explicitly by the absence of an App Server
-  binding and cannot wake an idle TUI.
+  The absence of an App Server socket selects the queue route at binding time.
+  SessionStart waits for verified registration before announcing receive readiness.
+  Codex 0.153.4 runs that hook on the first submitted turn after startup/resume;
+  merely opening an untouched TUI does not activate a receiver.
 - `meta.later=1` is deferred while active. Channel receipt never drains mail.
   Successful acceptance is cached against generation, conduit retry index and
   the brain's drain stamp, including across bridge restarts. The next intentional
   conduit re-ring is preserved. Exactly-once model injection cannot
-  be guaranteed across an app-server response loss before the acceptance record
+  be guaranteed across receiver acceptance followed by a crash before the record
   reaches disk; durable mailbox semantics remain at-least-once.
 - The Stop hook writes `run/turns/<identity>` as `turn 1 <epoch>`. Only the
   upstream brain writes `run/drained/<identity>`. A hook never consumes mail to
-  manufacture delivery evidence or starts a user continuation to wake a thread.
+  manufacture delivery evidence. Queue activity comes from UserPromptSubmit,
+  Stop, and Interrupt; stale turn completions cannot mark a newer turn idle.
+  SessionEnd releases the binding; the detached receiver unregisters itself.
+  Resuming a crashed thread assigns a new receiver token when its owner has exited.
 
 Codex protocol references: [App Server](https://learn.chatgpt.com/docs/app-server)
 and [hooks](https://learn.chatgpt.com/docs/hooks). Implementation was checked
@@ -36,6 +44,14 @@ Codex tool-output path, checks the model's acknowledgement, verifies that no
 user message was inserted, checks `route=channel` / `cc=codex:…`, and then
 explicitly drains the still-unread letter. The default suite also rejects a
 stale or incompatible running conduit after an on-disk upgrade.
+
+The ordinary-TUI route was also tested on Codex 0.153.4 with an installed
+plugin on Linux and macOS (`mini`), a real shared conduit, and no App Server launcher: automatic hook
+registration, idle queue wake, fixed user-notification content, unread durability,
+explicit drain, `--later` delivery after an active turn, and shutdown cleanup.
+Linux also verified receiver/binding cleanup after forcibly terminating its
+own fixture Codex process. This route does not claim Claude channel
+or App Server tool-output roles for its wake notification.
 
 The first live peer exchange on 2026-09-07 used `codex-ink@b200` and
 `ink@b200` (Claude): sender message `1788793333.1128594.23094.codex-ink@b200`,

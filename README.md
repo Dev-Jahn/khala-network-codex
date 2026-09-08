@@ -6,13 +6,13 @@ your SSH-connected fleet. This is the Codex harness adapter for
 
 The original Khala brain and transport own every message, acknowledgement,
 bounce, expiry, stream and cursor. This repository adds Codex identity binding,
-hooks, a channel adapter, and an App Server launcher. Mail never becomes a
-forged user prompt.
+hooks, a channel adapter, and an optional App Server launcher. Peer message
+bodies stay in the mailbox and are read through the original CLI.
 
 ## Install
 
 Requires Linux or macOS, Node.js 22+, Codex CLI 0.153.4+, Bash, SSH and rsync.
-Native automatic receive requires the shared Khala runtime 0.9.7+.
+Automatic receive requires the shared Khala runtime 0.9.7+ and trusted plugin hooks.
 
 ```sh
 codex plugin marketplace add Dev-Jahn/jahns-codex-marketplace
@@ -26,7 +26,7 @@ Khala brain, and the pinned, checksum-verified transport binary. Ensure
 `~/.local/bin` is on PATH. Setup preserves manual CLI installations and never
 downgrades a newer transport.
 After upgrading an existing node, restart its shared Khala conduit through that
-node's existing service manager. `run` checks the running conduit's fresh version
+node's existing service manager. Receive startup checks the running conduit's fresh version
 announcement as well as the installed binary, and reports a mismatch explicitly.
 
 For a source checkout:
@@ -50,19 +50,31 @@ It deliberately does not adopt Claude's `.khala-session`.
 
 ```sh
 printf '%s\n' codex-builder > .khala-codex-session
-khala-codex run
+codex
 ```
 
-`run` starts a local Codex App Server in a private Unix socket directory, a
+On the first submitted turn after starting or resuming Codex, its SessionStart
+hook automatically starts a session-specific channel bridge. An untouched empty
+TUI does not run that hook yet. Once connected, no further user input is needed
+for incoming mail to wake the session.
+When the shared conduit rings, the bridge calls `codex queue --thread <UUID>`
+with a fixed notification. This wakes an idle ordinary Codex TUI without a
+launcher. The notification appears as a **user message**; it contains only
+local routing/count information and the inbox command, never a peer's message
+body, subject, or sender-supplied instructions. Actual mail is read with
+`inbox --drain` as tool output. Hooks do not also emit duplicate mail reminders.
+
+`khala-codex run` remains available for native tool-output notifications. It
+starts a local Codex App Server in a private Unix socket directory, a
 Khala bridge, and a TUI connected to that server. The launcher owns those
 children and cleans them up when the TUI exits. To resume a session, use
 `khala-codex run resume <thread-id>`.
 
 | Mode | Sending and reading | Receiving while active | Waking while idle |
 |---|---|---|---|
+| Ordinary `codex` + trusted plugin hooks | Yes | Queued fixed notification | Yes, while Codex is running |
 | `khala-codex run` + trusted plugin hooks | Yes | Native tool output | Yes, while launcher is running |
 | Existing App Server + explicit bridge | Yes | Native tool output | Yes, while bridge/server are running |
-| Standalone Codex + trusted plugin hooks | Yes | Hook reminders at tool/user boundaries | No |
 | CLI only | Yes | Explicit drain | No |
 
 For an existing App Server, start it with `KHALA_CODEX_SOCKET=/absolute/app.sock`
@@ -70,7 +82,10 @@ so hooks record its address, and run
 `khala-codex bridge --socket /absolute/app.sock` alongside it. The bridge only
 acts on explicitly bound, loaded threads whose cwd matches. It never resumes
 an unloaded thread. `khala-codex bind` can register the current
-`CODEX_THREAD_ID`; `session` displays the binding. A stale binding is removed
+`CODEX_THREAD_ID` and starts automatic receive inside an ordinary Codex session;
+`session` displays the binding. Normal shutdown removes the binding and bridge.
+After a crash, the bridge detects the owner's PID and process birth and exits.
+A stale binding is removed
 explicitly with `unbind --thread <old-thread-id>`.
 
 ## Communicate
@@ -96,10 +111,18 @@ reads the actual letter through `inbox --drain`. A transport ACK only means
 Codex accepted a doorbell; the unread file stays durable until explicit read.
 `--later` waits while the receiving thread is active. Quiet info notices do not
 ring. As in Claude's conduit, stream-only arrivals do not ring; streams are
-read at the next drain. Hook mode can also remind about joined, non-quiet
-streams during a turn. Duplicate channel attempts are coalesced for the same
+read at the next drain. Duplicate channel attempts are coalesced for the same
 generation, conduit retry index and drain stamp. Hooks never insert message bodies as developer text,
-and the bridge never inserts user messages or types into a terminal.
+and neither route types into a terminal. The route is chosen at binding time;
+failure never switches from native tool output to the user-message queue.
+
+In ordinary Codex, UserPromptSubmit, Stop, and Interrupt hooks track turn
+activity for `--later`. The bridge uses the session's original `CODEX_HOME`
+and checks its owning process before queueing. Registration/startup failures
+are reported by the hook; details are in
+`$KHALA_HOME/log/codex-<identity>.log`. Review updated hooks in `/hooks` and
+resume or start a session and submit one message after upgrading from 0.1.0; an already-running
+session does not automatically load the new plugin code.
 
 Native listeners record `codex` in the shared runtime, independently of model
 and profile. Claude and Codex listeners share identity leases: concurrent listeners
@@ -112,6 +135,9 @@ the upstream conduit owns re-ring policy and watching presence.
 npm test
 node scripts/check.mjs
 ```
+
+If the host mounts `/tmp` with `noexec`, set `TMPDIR` to an executable temporary
+directory when running the tests; queue tests execute a fixture CLI.
 
 The real conduit/App Server fixture is opt-in and runs one small model turn
 using the configured Codex account:

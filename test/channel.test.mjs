@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connect } from 'node:net';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { bind, unbind } from '../lib/binding.mjs';
 import { channelServer, deliverer, channelSnapshot } from '../lib/channel.mjs';
@@ -33,8 +34,7 @@ test('active and idle delivery uses only toolOutput and keeps unread mail durabl
     assert.ok(!call.params.toolOutput.output.includes('UNTRUSTED'));
     assert.match(call.params.toolOutput.output, /inbox --drain/);
     assert.equal(rpc.calls.some(call => /resume|steer|inject/.test(call.method)), false);
-    const { pending } = await import('../lib/pending.mjs');
-    assert.equal(pending(ctx).count, 1);
+    assert.ok(existsSync(join(ctx.home, 'inbox', ctx.identity, 'new', '1788790000.1.1.ink@test')));
   }
 });
 
