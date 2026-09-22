@@ -41,6 +41,8 @@ test('request-id is idempotent through the same upstream brain', t => {
 
 test('explicit machine sender works without a Codex session declaration', t => {
   const { ctx } = fixture(t);
+  // Khala 0.9.9+ refuses notify from an undeclared watcher; declare it once like an operator would.
+  core(ctx, ['watcher', 'declare', 'machine-watch', '--cadence', '0', '--owner', 'ink@test']);
   const env = { ...process.env, KHALA_HOME: ctx.home };
   delete env.KHALA_SESSION;
   const result = spawnSync(process.execPath, [join(ROOT, 'bin/khala-codex'), 'notify', 'ink@test', '--as', 'machine-watch', '-s', 'observation'], {
