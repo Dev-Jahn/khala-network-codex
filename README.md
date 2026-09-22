@@ -149,11 +149,28 @@ node scripts/test-live.mjs ~/.khala/bin/khala-link
 Runtime dependencies are vendored with licenses and checksums, so installation
 needs no npm download. `vendor/khala/khala` is an unchanged upstream brain;
 `vendor/khala/upstream.json` pins its Git commit, version and release digests.
-Update it with `node scripts/vendor-khala.mjs /path/to/upstream-checkout` after
-the upstream public release exists. See [compatibility](docs/compatibility.md).
+The `sync-upstream.yml` workflow checks for a new upstream release every six
+hours. It can also be started manually:
+
+```sh
+gh workflow run sync-upstream.yml -R Dev-Jahn/khala-network-codex
+```
+
+After publishing a release, upstream can request an immediate check:
+
+```sh
+gh api repos/Dev-Jahn/khala-network-codex/dispatches -f event_type=khala-release
+```
+
+For local inspection, `node scripts/sync-upstream.mjs --dry-run` verifies the
+latest tag and all four release digests without changing files. The existing
+`node scripts/vendor-khala.mjs /path/to/upstream-checkout` command remains
+available for deliberate manual vendoring. See [compatibility](docs/compatibility.md).
 
 Main-branch CI validates and tests the plugin before automatically updating its
 exact commit pin in `Dev-Jahn/jahns-codex-marketplace`. Cross-repository write
-uses a deploy key scoped to that marketplace. See the checked-in workflow.
+uses a deploy key scoped to that marketplace. An automatic vendor commit starts
+that CI explicitly with `workflow_dispatch`, because pushes made by the sync
+workflow's `GITHUB_TOKEN` do not start push workflows. See the checked-in workflows.
 
 MIT. The vendored Khala brain and `ws` library retain their original licenses.

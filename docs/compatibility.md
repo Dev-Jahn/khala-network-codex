@@ -1,5 +1,19 @@
 # Compatibility contract
 
+The vendored upstream pin is checked against GitHub Releases every six hours by
+`.github/workflows/sync-upstream.yml`. A newer release is accepted only when its
+`vMAJOR.MINOR.PATCH` tag matches `KHALA_VERSION` in `bin/khala` and all four
+platform assets have SHA-256 digests; a backwards version or unverifiable
+release fails the sync. The workflow validates and tests changes before pushing
+the vendor-only commit, then dispatches `ci.yml` so the marketplace pin updates.
+
+Maintainers can start the check with
+`gh workflow run sync-upstream.yml -R Dev-Jahn/khala-network-codex`. Upstream
+release automation can trigger it immediately with
+`gh api repos/Dev-Jahn/khala-network-codex/dispatches -f event_type=khala-release`.
+Neither path changes the plugin package version; release versioning remains a
+separate maintainer decision.
+
 - Mail/notice/stream formats, addressing, replication and semantic operations
   come from the unchanged upstream brain. Codex state lives only in
   `$KHALA_HOME/run/codex/`; it is not replicated as mail.
