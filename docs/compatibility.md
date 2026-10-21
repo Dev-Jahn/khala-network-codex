@@ -49,12 +49,38 @@ separate maintainer decision.
   conduit re-ring is preserved. Exactly-once model injection cannot
   be guaranteed across receiver acceptance followed by a crash before the record
   reaches disk; durable mailbox semantics remain at-least-once.
-- The Stop hook writes `run/turns/<identity>` as `turn 1 <epoch>`. Only the
+- The interactive Stop hook writes `run/turns/<identity>` as `turn 1 <epoch>`. Only the
   upstream brain writes `run/drained/<identity>`. A hook never consumes mail to
-  manufacture delivery evidence. Queue activity comes from UserPromptSubmit,
+  manufacture delivery evidence; a lane hook drains mail only to place it in the
+  model's context. Queue activity comes from UserPromptSubmit,
   Stop, and Interrupt; stale turn completions cannot mark a newer turn idle.
   SessionEnd releases the binding; the detached receiver unregisters itself.
   Resuming a crashed thread assigns a new receiver token when its owner has exited.
+
+- Lane mode (`codex exec`, see the README) requires both `session_meta.source ==
+  "exec"` in the rollout named by the hook's `transcript_path` (with a matching
+  thread id) and an owning `codex` process whose argv has the `exec`/`e`
+  subcommand; otherwise the session is interactive. Lanes run no bridge and no
+  `codex queue`. SessionStart registers `runtime register --harness codex --kind
+  worker --receive-opt-in=false` with the Codex process as `--pid` and no channel;
+  `KHALA_PARENT` is passed to khala-link through the environment. PostToolUse
+  (`hooks/tool-boundary.sh`, declared with `additionalContextLimit: 0`) drains
+  with the brain's default caps and skips spawned subagents' tool calls
+  (`agent_id`); SessionStart and Stop drain a page of at most
+  6 KB of letters and 1.5 KB of notices so that their text fits Codex's fixed
+  2,500-token hook budget. Stop returns `{"decision":"block","reason":…}` at most
+  three times per turn (`stop_hook_active` and the turn id reset the count).
+  Mail that a drain cannot take within its caps is announced once and then held
+  until the inbox changes, so an oversized letter cannot cost a drain on every
+  tool call. A lane binding blocks interactive `bind` of the same identity until
+  the lane ends or is explicitly unbound. Codex releases older than the
+  `additionalContextLimit` setting ignore it and spill long PostToolUse context
+  to a file, which the model is pointed to. Verified against Codex 0.162.1 source
+  (hook schemas, `$SHELL -lc` command launch in the session cwd, Stop
+  continuation in `core/src/session/turn.rs`) and a real `codex exec` run with a
+  throwaway `CODEX_HOME`/`KHALA_HOME`: mail reached the model at SessionStart,
+  after a tool call, and through a Stop continuation, and SessionEnd released the
+  worker registration.
 
 Codex protocol references: [App Server](https://learn.chatgpt.com/docs/app-server)
 and [hooks](https://learn.chatgpt.com/docs/hooks). Implementation was checked

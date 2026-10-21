@@ -14,6 +14,22 @@ Identity is explicit: `KHALA_SESSION`, otherwise one line in
 names are rejected. Never infer an identity from the directory, the model, or
 the Claude `.khala-session` file. Use distinct identities for concurrent sessions.
 
+Lanes: a dispatcher such as hippo starts each non-interactive `codex exec` lane with
+`KHALA_SESSION` (this lane's identity) and `KHALA_PARENT` (the address of the
+session that launched it). Use exactly that identity; `whoami` prints
+`<identity>@<node>`. Never invent, derive or rename an identity: if
+`KHALA_SESSION` is missing, stop and report that the lane has no Khala identity.
+
+Hooks bind the lane at startup (`session` then shows `"mode": "lane"`); do not
+run `bind`. New mail arrives by itself
+at tool boundaries and before the run ends, as context that begins with
+`Khala mail for <identity>@<node>`. It is already marked read, so no polling,
+sleep loops or repeated `inbox --drain` are needed. Mail waits while one long
+command runs, so when you are waiting for a reply, wait in short steps.
+Report to the parent address in `KHALA_PARENT` with `send`, and answer a letter
+with `--reply-to <Id>`. Mail that arrives after the run ends stays in the
+inbox, and Khala tells the parent about it.
+
 On first setup, run `setup` to install the pinned shared Khala transport and the
 `khala-codex` launcher. For a new node, `init <node>` creates the mail tree;
 configure `peer` and `mailbox` lines in `$KHALA_HOME/config` (default
@@ -63,7 +79,7 @@ exists; quiet and leave decisions are preserved. `presence`, `minds`,
 are the upstream fleet tools. Declare actual values only. Harness identity is
 a machine-written registration fact, separate from profile and model.
 
-Ordinary `codex` supports automatic receive: on the first submitted turn after
+Interactive `codex` (the TUI) supports automatic receive: on the first submitted turn after
 startup/resume, trusted SessionStart hooks bind the thread and start a detached
 bridge. Opening an untouched TUI alone does not run that hook. The shared conduit delivers to this
 bridge, which calls `codex queue` with a fixed doorbell. The doorbell is recorded
