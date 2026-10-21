@@ -1,7 +1,7 @@
 {
   "name": "khala-network-codex",
-  "version": "0.2.1",
-  "description": "Durable mail and streams between Codex and Claude Code sessions, with automatic receive in ordinary Codex CLI sessions.",
+  "version": "0.3.0",
+  "description": "Durable mail and streams between Codex and Claude Code sessions, with automatic receive in ordinary Codex CLI sessions and in codex exec lanes.",
   "author": {
     "name": "Jahn",
     "url": "https://github.com/Dev-Jahn"
