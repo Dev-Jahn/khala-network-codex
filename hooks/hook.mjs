@@ -3,18 +3,22 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { context, core, ROOT } from '../lib/context.mjs';
 import { bind, readBinding, unbind } from '../lib/binding.mjs';
-import { activity, startQueue } from '../lib/queue.mjs';
+import { detectLane, logFailure, runLane } from '../lib/lane.mjs';
 
-let input = '';
-for await (const chunk of process.stdin) input += chunk;
-try {
-  const event = JSON.parse(input);
-  const cwd = event.cwd;
-  // Subagent hooks carry the parent's session id: only root SessionStart and
-  // SessionEnd own a binding. Peer content never enters hook output.
-  if (!cwd || (process.env.KHALA_SESSION === undefined && !existsSync(join(cwd, '.khala-codex-session')))) {
-    console.log('{}');
-  } else {
+const declared = cwd => Boolean(cwd) && (process.env.KHALA_SESSION !== undefined || existsSync(join(cwd, '.khala-codex-session')));
+
+// The route for ordinary Codex sessions (TUI, App Server).
+async function interactive(input) {
+  try {
+    const event = JSON.parse(input);
+    const cwd = event.cwd;
+    // Subagent hooks carry the parent's session id: only root SessionStart and
+    // SessionEnd own a binding. Peer content never enters hook output.
+    if (!declared(cwd)) {
+      console.log('{}');
+      return;
+    }
+    const { activity, startQueue } = await import('../lib/queue.mjs');
     const ctx = { ...context(cwd), root: ROOT };
     const name = event.hook_event_name;
     const existing = readBinding(ctx);
@@ -49,8 +53,23 @@ try {
       }
       console.log(JSON.stringify(text ? { hookSpecificOutput: { hookEventName: name, additionalContext: text } } : {}));
     }
+  } catch (error) {
+    console.error(`khala-codex hook: ${error.message}`);
+    process.exitCode = 1;
   }
-} catch (error) {
-  console.error(`khala-codex hook: ${error.message}`);
-  process.exitCode = 1;
 }
+
+let input = '';
+for await (const chunk of process.stdin) input += chunk;
+// A `codex exec` lane takes the lane route (lib/lane.mjs); a session that is not
+// recognized as a lane keeps the interactive route. PostToolUse, started by
+// tool-boundary.sh, exists only for lanes and is otherwise silent.
+let event = null, lane = null;
+try {
+  event = JSON.parse(input);
+  if (declared(event.cwd)) lane = detectLane(event);
+} catch (error) {
+  if (process.argv[2] === 'PostToolUse') logFailure(event, error);
+}
+if (lane) runLane(lane, event);
+else if (process.argv[2] !== 'PostToolUse') await interactive(input);
