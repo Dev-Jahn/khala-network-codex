@@ -134,14 +134,14 @@ test('a root SessionStart repairs an owned launcher for its cache and installs n
   assert.equal(run([launcher, 'version']).stdout, `khala ${VERSION}\n`);
 });
 
-test('a failed SessionStart repair is reported on the interactive route', { skip: process.getuid?.() === 0 && 'root ignores permissions' }, t => {
+test('a failed SessionStart repair warns on the interactive route without failing the session', { skip: process.getuid?.() === 0 && 'root ignores permissions' }, t => {
   const { cache, bin, launcher, plugin, hook, legacy } = layout(t);
   const root = plugin('0.3.0');
   legacy(join(cache, '0.2.1', 'bin', 'khala-codex'));
   chmodSync(bin, 0o555);
   let started;
   try { started = hook(root, 'SessionStart', { source: 'startup' }); } finally { chmodSync(bin, 0o755); }
-  assert.equal(started.status, 1);
+  assert.equal(started.status, 0);
   assert.equal(started.stdout, '{}\n');
   assert.match(started.stderr, /^khala-codex hook: launcher repair failed: EACCES/);
   assert.ok(lstatSync(launcher).isSymbolicLink());

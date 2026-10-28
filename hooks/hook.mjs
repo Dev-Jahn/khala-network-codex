@@ -81,6 +81,7 @@ if (event?.hook_event_name === 'SessionStart' && !event.agent_id) {
     healLauncher();
   } catch (error) {
     if (lane) log(lane.ctx, 'SessionStart', `launcher repair failed: ${error.message}`);
-    else { console.error(`khala-codex hook: launcher repair failed: ${error.message}`); process.exitCode = 1; }
+    // The session's own SessionStart output stands; a failed repair only warns.
+    else console.error(`khala-codex hook: launcher repair failed: ${error.message}`);
   }
 }
