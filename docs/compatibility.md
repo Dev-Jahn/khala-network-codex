@@ -17,6 +17,11 @@ separate maintainer decision.
 - Mail/notice/stream formats, addressing, replication and semantic operations
   come from the unchanged upstream brain. Codex state lives only in
   `$KHALA_HOME/run/codex/`; it is not replicated as mail.
+- `~/.local/bin/khala-codex` is a launcher holding the plugin's cache directory
+  (the parent of its version directories). Each run imports `bin/khala-codex`
+  from the numerically highest version that has one, or exits 1 naming that
+  directory; setup and root SessionStart replace only a launcher or symlink that
+  `~/.local/bin/.khala-codex-receipt` proves setup wrote.
 - `.khala-codex-session` is separate from `.khala-session`. Invalid explicit
   names are errors, and there is no directory-name inference.
 - The CLI forwards `CODEX_THREAD_ID` as `KHALA_HARNESS_SESSION_ID`, so shared

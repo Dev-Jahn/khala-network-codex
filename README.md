@@ -24,7 +24,11 @@ Khala skill to connect the session. The skill locates its bundled CLI. Run that
 CLI's `setup` command once to install `~/.local/bin/khala-codex`, the shared
 Khala brain, and the pinned, checksum-verified transport binary. Ensure
 `~/.local/bin` is on PATH. Setup preserves manual CLI installations and never
-downgrades a newer transport.
+downgrades a newer transport. The installed `khala-codex` is a small launcher
+that runs the newest plugin version in Codex's plugin cache, so it keeps working
+after `codex plugin` upgrades; each new session's SessionStart hook also
+replaces a symlink left by an older setup. From a source checkout, setup links
+`khala-codex` to that checkout instead.
 After upgrading an existing node, restart its shared Khala conduit through that
 node's existing service manager. Receive startup checks the running conduit's fresh version
 announcement as well as the installed binary, and reports a mismatch explicitly.
