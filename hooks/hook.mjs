@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { context, core, ROOT } from '../lib/context.mjs';
 import { bind, readBinding, unbind } from '../lib/binding.mjs';
-import { detectLane, logFailure, runLane } from '../lib/lane.mjs';
+import { detectLane, log, logFailure, runLane } from '../lib/lane.mjs';
 
 const declared = cwd => Boolean(cwd) && (process.env.KHALA_SESSION !== undefined || existsSync(join(cwd, '.khala-codex-session')));
 
@@ -73,3 +73,15 @@ try {
 }
 if (lane) runLane(lane, event);
 else if (process.argv[2] !== 'PostToolUse') await interactive(input);
+// A plugin upgrade deletes the version directory that an older
+// ~/.local/bin/khala-codex points into; a root SessionStart repairs it.
+if (event?.hook_event_name === 'SessionStart' && !event.agent_id) {
+  try {
+    const { healLauncher } = await import('../lib/launcher.mjs');
+    healLauncher();
+  } catch (error) {
+    if (lane) log(lane.ctx, 'SessionStart', `launcher repair failed: ${error.message}`);
+    // The session's own SessionStart output stands; a failed repair only warns.
+    else console.error(`khala-codex hook: launcher repair failed: ${error.message}`);
+  }
+}
