@@ -133,6 +133,14 @@ records the approval in `~/.codex/config.toml` as
 with a `trusted_hash`. Until then, lanes still get mail at SessionStart and Stop
 but not at tool boundaries.
 
+**Checking hook trust.** A Codex update can also mark every hook of the plugin
+as modified; Codex then runs none of them and says nothing, so no session or
+lane receives mail. `khala-codex hooks` asks Codex itself (through
+`codex app-server`, for the `CODEX_HOME` in effect) and prints one
+`<event>\t<trust status>` line per hook of this plugin. Its exit status is 0
+when every hook is trusted, 3 when at least one is not, and 4 when the trust
+could not be determined (the reason is on stderr).
+
 ## Communicate
 
 ```sh

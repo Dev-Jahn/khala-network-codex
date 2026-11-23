@@ -6,7 +6,7 @@ import { bind, readBinding, unbind } from '../lib/binding.mjs';
 try {
   const args = process.argv.slice(2);
   if (!args.length || args[0] === '--help') {
-    console.log('khala-codex: Claude-compatible mail for Codex.\nUsage: khala-codex <khala command> [args]\n       khala-codex setup\n       khala-codex run [codex options]\n       khala-codex bind|session\n       khala-codex unbind [--thread UUID]\n       khala-codex bridge --socket PATH\nIdentity: KHALA_SESSION or .khala-codex-session.');
+    console.log('khala-codex: Claude-compatible mail for Codex.\nUsage: khala-codex <khala command> [args]\n       khala-codex setup\n       khala-codex run [codex options]\n       khala-codex bind|session\n       khala-codex unbind [--thread UUID]\n       khala-codex hooks\n       khala-codex bridge --socket PATH\nIdentity: KHALA_SESSION or .khala-codex-session.');
   } else if (args[0] === 'setup') {
     const { setup } = await import('../lib/setup.mjs');
     await setup();
@@ -25,6 +25,18 @@ try {
     unbind(context(), args[2] ?? process.env.CODEX_THREAD_ID);
   } else if (args[0] === 'session') {
     console.log(JSON.stringify(readBinding(context()), null, 2));
+  } else if (args[0] === 'hooks') {
+    // Exit status is the contract: 0 every hook trusted, 3 some hook is not
+    // (Codex will not run it), 4 the trust could not be determined.
+    const { hookTrust } = await import('../lib/trust.mjs');
+    try {
+      const hooks = await hookTrust();
+      for (const hook of hooks) console.log(`${hook.eventName}\t${hook.trustStatus}`);
+      process.exitCode = hooks.every(hook => hook.trustStatus === 'trusted') ? 0 : 3;
+    } catch (error) {
+      console.error(`khala-codex: hook trust could not be checked: ${error.message}`);
+      process.exitCode = 4;
+    }
   } else if (args[0] === 'bridge') {
     if (args.length !== 3 || args[1] !== '--socket' || !args[2].startsWith('/')) throw new Error('Usage: khala-codex bridge --socket /absolute/path');
     const { bridge } = await import('../lib/bridge.mjs');
