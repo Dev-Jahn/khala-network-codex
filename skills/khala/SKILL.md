@@ -25,9 +25,17 @@ run `bind`. New mail arrives by itself
 at tool boundaries and before the run ends, as context that begins with
 `Khala mail for <identity>@<node>`. It is already marked read, so no polling,
 sleep loops or repeated `inbox --drain` are needed. Mail waits while one long
-command runs, so when you are waiting for a reply, wait in short steps.
+command runs, so never sit in one long sleep or polling loop. To wait for a job,
+run `watch --max-wait 300 --until '<check command>'` as its own command and
+repeat it: it returns `wake: delivery` as soon as mail lands (the mail then
+appears in context by itself) and `wake: condition` once the check command
+exits 0; the check runs every `--interval` seconds (default 30), for example
+`--until '! squeue -h -j 48213 | grep -q .'`. To wait only for a reply, use
+`watch --max-wait 300`.
 Report to the parent address in `KHALA_PARENT` with `send`, and answer a letter
-with `--reply-to <Id>`. Mail that arrives after the run ends stays in the
+with `--reply-to <Id>`. A parent may have ordinary mail announced only once per
+interval, so keep interim reports few, and add `--urgent` to `send` only when
+you cannot continue without the answer. Mail that arrives after the run ends stays in the
 inbox, and Khala tells the parent about it.
 
 If a command prints `khala-codex: the khala hooks of this Codex session did not
