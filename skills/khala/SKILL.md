@@ -30,6 +30,15 @@ Report to the parent address in `KHALA_PARENT` with `send`, and answer a letter
 with `--reply-to <Id>`. Mail that arrives after the run ends stays in the
 inbox, and Khala tells the parent about it.
 
+If a command prints `khala-codex: the khala hooks of this Codex session did not
+run` on stderr, Codex skipped this plugin's hooks (their trust has probably
+lapsed), so nothing above arrives by itself. Read mail with `inbox --drain`
+whenever you expect some, and tell your parent (`KHALA_PARENT`) or the user in
+your report. `hooks` shows each hook's trust; `trust-hooks` records it again,
+but only when the installed plugin is byte-identical to the published release.
+Leave both to the user or parent session unless asked, and never work around a
+refusal of `trust-hooks`.
+
 On first setup, run `setup` to install the pinned shared Khala transport and the
 `khala-codex` launcher. For a new node, `init <node>` creates the mail tree;
 configure `peer` and `mailbox` lines in `$KHALA_HOME/config` (default

@@ -6,7 +6,7 @@ import { bind, readBinding, unbind } from '../lib/binding.mjs';
 try {
   const args = process.argv.slice(2);
   if (!args.length || args[0] === '--help') {
-    console.log('khala-codex: Claude-compatible mail for Codex.\nUsage: khala-codex <khala command> [args]\n       khala-codex setup\n       khala-codex run [codex options]\n       khala-codex bind|session\n       khala-codex unbind [--thread UUID]\n       khala-codex hooks\n       khala-codex bridge --socket PATH\nIdentity: KHALA_SESSION or .khala-codex-session.');
+    console.log('khala-codex: Claude-compatible mail for Codex.\nUsage: khala-codex <khala command> [args]\n       khala-codex setup\n       khala-codex run [codex options]\n       khala-codex bind|session\n       khala-codex unbind [--thread UUID]\n       khala-codex hooks|trust-hooks\n       khala-codex bridge --socket PATH\nIdentity: KHALA_SESSION or .khala-codex-session.');
   } else if (args[0] === 'setup') {
     const { setup } = await import('../lib/setup.mjs');
     await setup();
@@ -25,17 +25,27 @@ try {
     unbind(context(), args[2] ?? process.env.CODEX_THREAD_ID);
   } else if (args[0] === 'session') {
     console.log(JSON.stringify(readBinding(context()), null, 2));
-  } else if (args[0] === 'hooks') {
-    // Exit status is the contract: 0 every hook trusted, 3 some hook is not
-    // (Codex will not run it), 4 the trust could not be determined.
-    const { hookTrust } = await import('../lib/trust.mjs');
+  } else if (args[0] === 'hooks' || args[0] === 'trust-hooks') {
+    // Exit status is the contract: 0 every hook is trusted (trust-hooks: is
+    // trusted now), 3 some hook is not (Codex will not run it), 4 the trust
+    // could not be determined, 5 trust-hooks refused to record trust because
+    // the installed plugin could not be shown to be the published release.
+    const { hookTrust, trustHooks, Refusal } = await import('../lib/trust.mjs');
     try {
-      const hooks = await hookTrust();
-      for (const hook of hooks) console.log(`${hook.eventName}\t${hook.trustStatus}`);
+      let hooks;
+      if (args[0] === 'hooks') {
+        hooks = await hookTrust();
+        for (const hook of hooks) console.log(`${hook.eventName}\t${hook.trustStatus}`);
+      } else {
+        hooks = (await trustHooks()).map(hook => ({ ...hook, trustStatus: hook.now }));
+        for (const hook of hooks) console.log(`${hook.eventName}\t${hook.was}\t${hook.now}`);
+        if (hooks.every(hook => hook.was === 'trusted')) console.log('Every khala-network-codex hook was already trusted; nothing was recorded.');
+      }
       process.exitCode = hooks.every(hook => hook.trustStatus === 'trusted') ? 0 : 3;
     } catch (error) {
-      console.error(`khala-codex: hook trust could not be checked: ${error.message}`);
-      process.exitCode = 4;
+      if (error instanceof Refusal) console.error(`khala-codex: hook trust was not recorded and nothing was changed: ${error.message}`);
+      else console.error(`khala-codex: hook trust could not be checked: ${error.message}`);
+      process.exitCode = error instanceof Refusal ? 5 : 4;
     }
   } else if (args[0] === 'bridge') {
     if (args.length !== 3 || args[1] !== '--socket' || !args[2].startsWith('/')) throw new Error('Usage: khala-codex bridge --socket /absolute/path');
@@ -50,6 +60,11 @@ try {
     const explicitIdentity = (['send', 'say', 'notify'].includes(args[0]) && args.includes('--as')) ||
       (args[0] === 'watch' && args.includes('--session')) || (args[0] === 'stream' && args[1] === 'cat');
     if (!noIdentity.has(args[0]) && !explicitIdentity) env.KHALA_SESSION = context().identity;
+    if (!noIdentity.has(args[0])) {
+      const { hooksMissed } = await import('../lib/ran.mjs');
+      // One line on stderr; the command itself runs unchanged.
+      if (hooksMissed()) console.error('khala-codex: the khala hooks of this Codex session did not run (hook trust has probably lapsed; `khala-codex hooks` shows it), so mail will not arrive by itself: read it with inbox --drain and tell your parent or user.');
+    }
     const child = spawn('bash', [CORE, ...args], { env, stdio: 'inherit' });
     child.on('error', error => { console.error(`khala-codex: ${error.message}`); process.exitCode = 1; });
     child.on('exit', (code, signal) => { process.exitCode = code ?? (signal ? 1 : 0); });

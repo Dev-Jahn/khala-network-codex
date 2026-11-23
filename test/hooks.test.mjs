@@ -49,3 +49,21 @@ test('Stop writes turn evidence without creating a continuation or consuming mai
   assert.deepEqual(hook(ctx, 'SessionEnd'), {});
   assert.ok(!existsSync(join(ctx.home, 'run', 'codex', `${ctx.identity}.json`)));
 });
+
+test('a mail command says on stderr, and nowhere else, that its Codex session left no SessionStart marker', t => {
+  const { ctx } = fixture(t);
+  // A Codex session id is a UUIDv7; this session was created just now.
+  const session = `${Date.now().toString(16).padStart(12, '0').replace(/^.{8}/, '$&-')}-7000-8000-000000000000`;
+  const { CODEX_THREAD_ID, CODEX_SESSION_ID, ...outside } = { ...process.env, KHALA_HOME: ctx.home, KHALA_SESSION: ctx.identity };
+  const inbox = env => spawnSync(process.execPath, [join(ROOT, 'bin/khala-codex'), 'inbox'], { cwd: ctx.cwd, env, encoding: 'utf8' });
+  const inside = thread => inbox({ ...outside, CODEX_SESSION_ID: session, CODEX_THREAD_ID: thread });
+  mail(ctx, '1788790000.1.1.ink@test');
+  const plain = inbox(outside), missed = inside(session);
+  assert.deepEqual([missed.status, missed.stdout], [plain.status, plain.stdout]);
+  assert.match(missed.stderr.slice(0, missed.stderr.length - plain.stderr.length), /^khala-codex: the khala hooks of this Codex session did not run .+\n$/);
+  hook(ctx, 'SessionStart', { session_id: session }, { KHALA_CODEX_SOCKET: '/tmp/app.sock' });
+  // A subagent's commands carry its own thread id and the root's session id.
+  for (const thread of [session, 'subagent-thread']) assert.equal(inside(thread).stderr, plain.stderr);
+  hook(ctx, 'SessionEnd', { session_id: session });
+  assert.ok(!existsSync(join(ctx.home, 'run', 'codex', `${session}.hooks`)));
+});

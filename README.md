@@ -139,7 +139,48 @@ lane receives mail. `khala-codex hooks` asks Codex itself (through
 `codex app-server`, for the `CODEX_HOME` in effect) and prints one
 `<event>\t<trust status>` line per hook of this plugin. Its exit status is 0
 when every hook is trusted, 3 when at least one is not, and 4 when the trust
-could not be determined (the reason is on stderr).
+could not be determined (the reason is on stderr). Codex 0.171 stores a hash
+of the whole plugin directory with each trust record, so every update of the
+plugin (and any change inside the installed copy, its `.git` included) makes
+all its hooks `modified` again.
+
+**Recording hook trust again.** `khala-codex trust-hooks` records trust for
+every hook of this plugin that Codex does not trust, through the same
+`codex app-server` API that `/hooks` in the Codex TUI uses, and prints one
+`<event>\t<status before>\t<status now>` line per hook. It never touches the
+hooks of another plugin, and it writes nothing itself.
+
+It records trust only for the published release. Codex keeps an installed
+plugin as a clone of the commit that the marketplace names
+(`$CODEX_HOME/plugins/cache/<marketplace>/khala-network-codex/<version>/`).
+The command takes the plugin directory that Codex reports for the hooks,
+downloads the marketplace file of
+[jahns-codex-marketplace](https://github.com/Dev-Jahn/jahns-codex-marketplace)
+and the source archive of the commit it names from this repository on GitHub,
+and compares them: apart from the clone's `.git` directory, the installed copy
+must hold exactly the files of that commit with exactly their bytes. If a file
+differs, is missing or was added, if the installed copy is older or newer than
+the published commit (update the plugin first), or if a download fails, the
+command refuses: it changes nothing and names the file or the URL on stderr.
+There is no option that overrides a refusal; `/hooks` in the Codex TUI stays
+the manual way. The two downloads are its only network use.
+
+Exit status of `trust-hooks`: 0 when every hook is trusted now (including when
+nothing had to be recorded), 3 when a hook is still not trusted afterwards, 4
+when the trust could not be determined, 5 when it refused.
+
+**When hooks did not run.** A session cannot notice from the inside that Codex
+skipped its hooks: it only gets no mail. SessionStart therefore leaves a marker
+for the Codex session in `$KHALA_HOME/run/codex/<session id>.hooks` (SessionEnd
+removes it; markers older than 30 days are pruned). A mail command of
+`khala-codex` that runs inside a Codex session without that marker prints one
+line on stderr, beginning `khala-codex: the khala hooks of this Codex session
+did not run`; its output and exit status stay the same. A lane that sees the
+line reads its mail with `inbox --drain` and tells its parent or user, who then
+runs `khala-codex hooks` and `khala-codex trust-hooks` on that node. The line is
+not printed for a session that started before the installed plugin version did
+or more than 30 days ago, and it assumes that the command and the session's
+hooks use the same `KHALA_HOME`.
 
 ## Communicate
 

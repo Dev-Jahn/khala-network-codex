@@ -71,6 +71,16 @@ try {
 } catch (error) {
   if (process.argv[2] === 'PostToolUse') logFailure(event, error);
 }
+// Root sessions only: a subagent's events carry its parent's session id.
+if (event && !event.agent_id && ['SessionStart', 'SessionEnd'].includes(event.hook_event_name)) {
+  try {
+    const { recordRan } = await import('../lib/ran.mjs');
+    recordRan(event.session_id, event.hook_event_name === 'SessionStart');
+  } catch (error) {
+    if (lane) log(lane.ctx, event.hook_event_name, `hooks-ran marker failed: ${error.message}`);
+    else console.error(`khala-codex hook: hooks-ran marker failed: ${error.message}`);
+  }
+}
 if (lane) runLane(lane, event);
 else if (process.argv[2] !== 'PostToolUse') await interactive(input);
 // A plugin upgrade deletes the version directory that an older
