@@ -1,12 +1,12 @@
 {
   "repository": "https://github.com/Dev-Jahn/khala-network",
-  "commit": "e1ee85e3ba729bd14ba2601e63e242618943b8d9",
-  "version": "0.9.14",
-  "sha256": "48034d18bdd4fca5a12ab70fdcd33fe490e0f260dcd9936e148a65417281c3b9",
+  "commit": "93fe702cbdd57d2bd62a7edd2b79b6ce7b3f8013",
+  "version": "0.9.15",
+  "sha256": "3307f10fda2bcb5465c201dc7ad0faa6bc393f298b3bb5abb6cb7e0e988ea62c",
   "assets": {
-    "khala-link-darwin-amd64": "e9c4e38698a02c09cf2439f758ca9cde4bf36e75d526871b13bd2bc2215126b0",
-    "khala-link-darwin-arm64": "d8cb4c4f43fc3eb11f271fd6d6ffa78cfb083aa7f3f02e7e8aec4e7eb667d6a7",
-    "khala-link-linux-amd64": "594bf4324433d529597cdab2a52d6e95592709698e5c16d1ecb8d4456dccdc1f",
-    "khala-link-linux-arm64": "bf61b8e152b39e0ab5514b26aea8bd531f440845c1aa4e16f1f58590ca33dc12"
+    "khala-link-darwin-amd64": "5c1b86d8c664b43407038a8a0c6073e7789e72da29e42ef1ef3bf6d43154d8ce",
+    "khala-link-darwin-arm64": "4b844b3e1ee90304e887597f5ac1999d90eac40bd29c9567ab138a544c2d9ac4",
+    "khala-link-linux-amd64": "888d8bbbd1de38e6ae37ce17fb881631cb7d6956574efad759f3f242ebd28c14",
+    "khala-link-linux-arm64": "c9005d2dae408cd12383494da2e66335fcdb153529c7658e8cd931ff217ffd21"
   }
 }
