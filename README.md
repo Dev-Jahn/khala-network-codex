@@ -169,6 +169,37 @@ Exit status of `trust-hooks`: 0 when every hook is trusted now (including when
 nothing had to be recorded), 3 when a hook is still not trusted afterwards, 4
 when the trust could not be determined, 5 when it refused.
 
+**Other plugins of the marketplace.** `hooks` and `trust-hooks` take
+`--plugin NAME`, any number of times, and then act on those plugins instead of
+this one (`khala-codex trust-hooks --plugin hippo`). The rule is the same for
+every name: Codex must list the hooks under `NAME@jahns-codex-marketplace`, the
+marketplace file must have an entry of that name whose source is a
+`https://github.com/Dev-Jahn/<repository>.git` pinned to a full commit id, and
+the installed copy must equal that commit's archive. With more than one plugin,
+each line starts with the plugin name and a tab, a refusal concerns only the
+plugin it names, and the exit status is the worst one (5, then 4, 3, 0).
+
+**Restoring trust automatically.** Codex re-creates every plugin directory of a
+marketplace when it refreshes that marketplace, which makes all their hooks
+`modified` at once. `khala-codex auto-trust NAME...` lists the plugins whose
+trust may then be recorded again without asking; `khala-codex auto-trust`
+prints the list and `khala-codex auto-trust off` clears it. The list is the
+file `$KHALA_HOME/codex-auto-trust`, one name per line, and it is empty until
+you set it. Setting it also writes `$KHALA_HOME/codex-auto-trust.path`: one
+line, the directory of the running `node` followed by the `PATH` of the shell
+you set it from, which the service uses as its `PATH` for the run (its own has
+neither `node` nor `codex`). If `codex` is not on that `PATH`, setting the list
+fails and writes nothing; `off` removes both files. `khala-codex auto-trust --run` does for every listed plugin what
+`trust-hooks --plugin NAME` does — the same verification, the same refusals —
+and prints `<plugin>\t<event>\t<status before>\t<status now>` per hook, with
+one `khala-codex: <plugin>: ...` line on stderr for each plugin it could not
+check or refused. It exits 0 when every hook of every listed plugin is trusted
+afterwards (and at once, printing nothing, when the list is empty), otherwise
+with the worst of 3, 4 and 5. It is meant to be called by the Khala service
+whenever the plugin cache changes; calling it again, or twice at once, is
+harmless. While Codex is still re-creating a directory it refuses or cannot
+check (5 or 4) and changes nothing, so the caller tries again afterwards.
+
 **When hooks did not run.** A session cannot notice from the inside that Codex
 skipped its hooks: it only gets no mail. SessionStart therefore leaves a marker
 for the Codex session in `$KHALA_HOME/run/codex/<session id>.hooks` (SessionEnd

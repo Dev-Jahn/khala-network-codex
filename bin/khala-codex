@@ -7,7 +7,7 @@ import { executable } from '../lib/process.mjs';
 try {
   const args = process.argv.slice(2);
   if (!args.length || args[0] === '--help') {
-    console.log('khala-codex: Claude-compatible mail for Codex.\nUsage: khala-codex <khala command> [args]\n       khala-codex setup\n       khala-codex run [codex options]\n       khala-codex bind|session\n       khala-codex unbind [--thread UUID]\n       khala-codex hooks|trust-hooks\n       khala-codex bridge --socket PATH\nIdentity: KHALA_SESSION or .khala-codex-session.');
+    console.log('khala-codex: Claude-compatible mail for Codex.\nUsage: khala-codex <khala command> [args]\n       khala-codex setup\n       khala-codex run [codex options]\n       khala-codex bind|session\n       khala-codex unbind [--thread UUID]\n       khala-codex hooks|trust-hooks [--plugin NAME]...\n       khala-codex auto-trust [NAME...|off|--run]\n       khala-codex bridge --socket PATH\nIdentity: KHALA_SESSION or .khala-codex-session.');
   } else if (args[0] === 'setup') {
     const { setup } = await import('../lib/setup.mjs');
     await setup();
@@ -26,27 +26,47 @@ try {
     unbind(context(), args[2] ?? process.env.CODEX_THREAD_ID);
   } else if (args[0] === 'session') {
     console.log(JSON.stringify(readBinding(context()), null, 2));
-  } else if (args[0] === 'hooks' || args[0] === 'trust-hooks') {
-    // Exit status is the contract: 0 every hook is trusted (trust-hooks: is
-    // trusted now), 3 some hook is not (Codex will not run it), 4 the trust
-    // could not be determined, 5 trust-hooks refused to record trust because
-    // the installed plugin could not be shown to be the published release.
-    const { hookTrust, trustHooks, Refusal } = await import('../lib/trust.mjs');
-    try {
-      let hooks;
-      if (args[0] === 'hooks') {
-        hooks = await hookTrust();
-        for (const hook of hooks) console.log(`${hook.eventName}\t${hook.trustStatus}`);
-      } else {
-        hooks = (await trustHooks()).map(hook => ({ ...hook, trustStatus: hook.now }));
-        for (const hook of hooks) console.log(`${hook.eventName}\t${hook.was}\t${hook.now}`);
-        if (hooks.every(hook => hook.was === 'trusted')) console.log('Every khala-network-codex hook was already trusted; nothing was recorded.');
+  } else if (['hooks', 'trust-hooks', 'auto-trust'].includes(args[0])) {
+    // Exit status is the contract, the worst over the plugins asked about:
+    // 0 every hook is trusted (trust-hooks: is trusted now), 3 some hook is
+    // not (Codex will not run it), 4 the trust could not be determined,
+    // 5 trust-hooks refused to record trust because the installed plugin could
+    // not be shown to be the published release.
+    const { hookTrust, trustHooks, autoTrusted, setAutoTrusted, Refusal } = await import('../lib/trust.mjs');
+    const [command, ...rest] = args;
+    const run = command === 'auto-trust' && rest[0] === '--run';
+    if (command === 'auto-trust' && !run) {
+      if (!rest.length) for (const plugin of autoTrusted()) console.log(plugin);
+      else if (rest.includes('off') && rest.length > 1) throw new Error('Usage: khala-codex auto-trust [NAME...|off|--run]');
+      else setAutoTrusted(rest[0] === 'off' ? [] : rest);
+    } else {
+      let plugins = ['khala-network-codex'];
+      if (run) {
+        if (rest.length !== 1) throw new Error('Usage: khala-codex auto-trust --run');
+        try { plugins = autoTrusted(); }
+        catch (error) { console.error(`khala-codex: hook trust could not be checked: ${error.message}`); process.exit(4); }
+      } else if (rest.length) {
+        if (rest.length % 2 || rest.some((arg, at) => at % 2 === 0 && arg !== '--plugin')) throw new Error(`Usage: khala-codex ${command} [--plugin NAME]...`);
+        plugins = [...new Set(rest.filter((arg, at) => at % 2))];
       }
-      process.exitCode = hooks.every(hook => hook.trustStatus === 'trusted') ? 0 : 3;
-    } catch (error) {
-      if (error instanceof Refusal) console.error(`khala-codex: hook trust was not recorded and nothing was changed: ${error.message}`);
-      else console.error(`khala-codex: hook trust could not be checked: ${error.message}`);
-      process.exitCode = error instanceof Refusal ? 5 : 4;
+      // One plugin reads as it always has; several are told apart by name.
+      const named = run || plugins.length > 1;
+      const outcomes = !plugins.length ? [] : command === 'hooks' ? await hookTrust(plugins) : await trustHooks(plugins);
+      process.exitCode = Math.max(0, ...outcomes.map(({ plugin, hooks, error }) => {
+        const out = line => console.log(named ? `${plugin}\t${line}` : line);
+        if (error) {
+          const what = error instanceof Refusal ? `hook trust was not recorded and nothing ${named ? 'of it ' : ''}was changed` : 'hook trust could not be checked';
+          console.error(`khala-codex: ${named ? `${plugin}: ` : ''}${what}: ${error.message}`);
+          return error instanceof Refusal ? 5 : 4;
+        }
+        if (command === 'hooks') {
+          for (const hook of hooks) out(`${hook.eventName}\t${hook.trustStatus}`);
+          return hooks.every(hook => hook.trustStatus === 'trusted') ? 0 : 3;
+        }
+        for (const hook of hooks) out(`${hook.eventName}\t${hook.was}\t${hook.now}`);
+        if (!run && hooks.every(hook => hook.was === 'trusted')) out(`Every ${plugin} hook was already trusted; nothing was recorded.`);
+        return hooks.every(hook => hook.now === 'trusted') ? 0 : 3;
+      }));
     }
   } else if (args[0] === 'bridge') {
     if (args.length !== 3 || args[1] !== '--socket' || !args[2].startsWith('/')) throw new Error('Usage: khala-codex bridge --socket /absolute/path');
