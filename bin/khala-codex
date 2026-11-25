@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 import { context, CORE } from '../lib/context.mjs';
 import { bind, readBinding, unbind } from '../lib/binding.mjs';
+import { executable } from '../lib/process.mjs';
 
 try {
   const args = process.argv.slice(2);
@@ -65,7 +66,7 @@ try {
       // One line on stderr; the command itself runs unchanged.
       if (hooksMissed()) console.error('khala-codex: the khala hooks of this Codex session did not run (hook trust has probably lapsed; `khala-codex hooks` shows it), so mail will not arrive by itself: read it with inbox --drain and tell your parent or user.');
     }
-    const child = spawn('bash', [CORE, ...args], { env, stdio: 'inherit' });
+    const child = spawn(executable('bash'), [CORE, ...args], { env, stdio: 'inherit' });
     child.on('error', error => { console.error(`khala-codex: ${error.message}`); process.exitCode = 1; });
     child.on('exit', (code, signal) => { process.exitCode = code ?? (signal ? 1 : 0); });
   }
